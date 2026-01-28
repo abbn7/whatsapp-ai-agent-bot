@@ -36,8 +36,10 @@ const client = new Client({
 // متغير لحفظ حالة البوت
 let isWhatsAppReady = false;
 
+let qrSent = false;
 // إرسال QR لتليجرام
 client.on('qr', (qr) => {
+    if (isWhatsAppReady) return; // لا ترسل QR إذا كان البوت متصلاً بالفعل
     console.log('QR Received, sending to Telegram...');
     qrcode.toBuffer(qr, (err, buffer) => {
         if (!err) {
@@ -48,6 +50,7 @@ client.on('qr', (qr) => {
 
 client.on('authenticated', () => {
     console.log('AUTHENTICATED');
+    isWhatsAppReady = true; // نعتبره متصلاً بمجرد التوثيق لإيقاف الـ QR
     tgBot.sendMessage(chatId, '🔐 تم تسجيل الدخول بنجاح! جاري تشغيل المحرك...');
 });
 
@@ -69,29 +72,20 @@ client.on('disconnected', (reason) => {
     client.initialize();
 });
 
-client.on('message_create', async (msg) => {
-    // استخدمنا message_create لضمان التقاط الرسائل حتى لو كانت من البوت نفسه أو في ظروف معينة
+client.on('message', async (msg) => {
     try {
         const chat = await msg.getChat();
-        const isGroup = chat.isGroup;
         const chatName = chat.name || "Unknown";
         const body = msg.body || "";
 
-        // إرسال تنبيه لتليجرام للتشخيص (Debug)
-        if (body.length > 0) {
-            console.log(`[DEBUG] Message from ${chatName}: ${body}`);
-            // سنرسل فقط أول 50 حرف لتليجرام للتأكد أن البوت "يسمع" الرسائل
-            // tgBot.sendMessage(chatId, `🔍 استلمت رسالة من: ${chatName}\nالمحتوى: ${body.substring(0, 50)}...`);
-        }
+        // تنبيه تليجرام لكل رسالة (للتأكد أن البوت يعمل)
+        tgBot.sendMessage(chatId, `📩 رسالة جديدة من [${chatName}]: ${body.substring(0, 100)}`);
 
-        // التحقق من الشرط: جروب Cs أو رسالة خاصة
-        // قمنا بتحسين التحقق ليشمل الاسم أو المعرف
-        const isTargetGroup = isGroup && (chatName.includes("Cs") || chat.id._serialized.includes("Cs"));
-        const isPrivate = !isGroup;
+        const isTargetGroup = chat.isGroup && chatName.includes("Cs");
+        const isPrivate = !chat.isGroup;
 
         if (isTargetGroup || isPrivate) {
-            // تجاهل الرسائل التي تبدأ بـ ! أو . إذا أردت (اختياري)
-            if (msg.fromMe) return; // لا يرد على نفسه لتجنب اللوب
+            if (msg.fromMe) return;
 
             await chat.sendStateTyping();
             const aiResponse = await getAIResponse(body);
@@ -100,7 +94,13 @@ client.on('message_create', async (msg) => {
         }
     } catch (error) {
         console.error('Error handling message:', error);
-        // tgBot.sendMessage(chatId, `❌ خطأ في معالجة الرسالة: ${error.message}`);
+    }
+});
+
+// إضافة مستمع لرسائل البوت نفسه (للتأكد من العمل في كل الظروف)
+client.on('message_create', async (msg) => {
+    if (msg.fromMe && msg.body.includes("!test")) {
+        await msg.reply("البوت شغال وبيرد تمام! ✅");
     }
 });
 
