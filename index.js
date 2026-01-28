@@ -59,10 +59,21 @@ client.on('auth_failure', msg => {
     tgBot.sendMessage(chatId, '❌ فشل تسجيل الدخول: ' + msg);
 });
 
-client.on('ready', () => {
+client.on('ready', async () => {
     console.log('WhatsApp Client is ready!');
     isWhatsAppReady = true;
-    tgBot.sendMessage(chatId, '✅ البوت الآن متصل وشغال تمام على واتساب! أرسل أي رسالة في جروب Cs للتجربة.');
+    
+    // إرسال رسالة ترحيب لتليجرام
+    tgBot.sendMessage(chatId, '✅ البوت الآن متصل وشغال تمام على واتساب! جاري إرسال رسالة ترحيب على واتساب...');
+
+    try {
+        // إرسال رسالة لنفسه على واتساب (للتأكيد)
+        const myNumber = client.info.wid._serialized;
+        await client.sendMessage(myNumber, '🚀 تم تشغيل البوت بنجاح! أنا الآن جاهز للرد على الرسائل في جروب Cs والخاص.');
+        console.log('Welcome message sent to self on WhatsApp');
+    } catch (err) {
+        console.error('Failed to send welcome message on WhatsApp:', err);
+    }
 });
 
 client.on('disconnected', (reason) => {
@@ -72,21 +83,31 @@ client.on('disconnected', (reason) => {
     client.initialize();
 });
 
-client.on('message', async (msg) => {
+client.on('message_create', async (msg) => {
+    // نستخدم message_create لضمان التقاط كل الرسائل فوراً
     try {
+        if (msg.body.length === 0) return;
+
         const chat = await msg.getChat();
         const chatName = chat.name || "Unknown";
-        const body = msg.body || "";
+        const body = msg.body;
 
-        // تنبيه تليجرام لكل رسالة (للتأكد أن البوت يعمل)
-        tgBot.sendMessage(chatId, `📩 رسالة جديدة من [${chatName}]: ${body.substring(0, 100)}`);
+        // تجاهل رسائل البوت نفسه إلا إذا كانت أمر اختبار
+        if (msg.fromMe) {
+            if (body === "!test") {
+                await msg.reply("البوت شغال وبيرد تمام! ✅");
+            }
+            return;
+        }
 
-        const isTargetGroup = chat.isGroup && chatName.includes("Cs");
+        // تنبيه تليجرام (اختياري، قمت بتفعيله للتأكد)
+        tgBot.sendMessage(chatId, `📩 رسالة من [${chatName}]: ${body.substring(0, 100)}`);
+
+        const isTargetGroup = chat.isGroup && (chatName.toLowerCase().includes("cs") || chat.id._serialized.includes("cs"));
         const isPrivate = !chat.isGroup;
 
         if (isTargetGroup || isPrivate) {
-            if (msg.fromMe) return;
-
+            console.log(`[PROCESS] Thinking about: ${body}`);
             await chat.sendStateTyping();
             const aiResponse = await getAIResponse(body);
             await msg.reply(aiResponse);
@@ -97,12 +118,7 @@ client.on('message', async (msg) => {
     }
 });
 
-// إضافة مستمع لرسائل البوت نفسه (للتأكد من العمل في كل الظروف)
-client.on('message_create', async (msg) => {
-    if (msg.fromMe && msg.body.includes("!test")) {
-        await msg.reply("البوت شغال وبيرد تمام! ✅");
-    }
-});
+
 
 client.initialize();
 
