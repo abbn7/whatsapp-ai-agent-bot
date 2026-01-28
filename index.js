@@ -17,7 +17,17 @@ const chatId = "5322402925";
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ],
         executablePath: process.env.CHROME_PATH || null
     }
 });
@@ -35,10 +45,27 @@ client.on('qr', (qr) => {
     });
 });
 
+client.on('authenticated', () => {
+    console.log('AUTHENTICATED');
+    tgBot.sendMessage(chatId, '🔐 تم تسجيل الدخول بنجاح! جاري تشغيل المحرك...');
+});
+
+client.on('auth_failure', msg => {
+    console.error('AUTHENTICATION FAILURE', msg);
+    tgBot.sendMessage(chatId, '❌ فشل تسجيل الدخول: ' + msg);
+});
+
 client.on('ready', () => {
     console.log('WhatsApp Client is ready!');
     isWhatsAppReady = true;
-    tgBot.sendMessage(chatId, '✅ WhatsApp Bot is now ONLINE and ready to serve!');
+    tgBot.sendMessage(chatId, '✅ البوت الآن متصل وشغال تمام على واتساب! أرسل أي رسالة في جروب Cs للتجربة.');
+});
+
+client.on('disconnected', (reason) => {
+    console.log('Client was logged out', reason);
+    isWhatsAppReady = false;
+    tgBot.sendMessage(chatId, '⚠️ تم فصل البوت من واتساب. السبب: ' + reason + '\nجاري محاولة إعادة الاتصال...');
+    client.initialize();
 });
 
 client.on('message', async (msg) => {
