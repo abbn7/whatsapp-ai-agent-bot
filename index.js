@@ -22,11 +22,12 @@ const client = new Client({
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
+            '--disable-setuid-sandbox',
             '--no-first-run',
             '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
+            '--deterministic-mode',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--shm-size=3gb'
         ],
         executablePath: process.env.CHROME_PATH || null
     }
@@ -68,22 +69,38 @@ client.on('disconnected', (reason) => {
     client.initialize();
 });
 
-client.on('message', async (msg) => {
+client.on('message_create', async (msg) => {
+    // استخدمنا message_create لضمان التقاط الرسائل حتى لو كانت من البوت نفسه أو في ظروف معينة
     try {
         const chat = await msg.getChat();
-        
-        // التحقق إذا كانت الرسالة من الجروب المطلوب أو شات خاص
-        if (chat.name === "Cs" || !chat.isGroup) {
-            console.log(`Message from ${chat.name}: ${msg.body}`);
-            
-            // إظهار حالة "يكتب الآن"
+        const isGroup = chat.isGroup;
+        const chatName = chat.name || "Unknown";
+        const body = msg.body || "";
+
+        // إرسال تنبيه لتليجرام للتشخيص (Debug)
+        if (body.length > 0) {
+            console.log(`[DEBUG] Message from ${chatName}: ${body}`);
+            // سنرسل فقط أول 50 حرف لتليجرام للتأكد أن البوت "يسمع" الرسائل
+            // tgBot.sendMessage(chatId, `🔍 استلمت رسالة من: ${chatName}\nالمحتوى: ${body.substring(0, 50)}...`);
+        }
+
+        // التحقق من الشرط: جروب Cs أو رسالة خاصة
+        // قمنا بتحسين التحقق ليشمل الاسم أو المعرف
+        const isTargetGroup = isGroup && (chatName.includes("Cs") || chat.id._serialized.includes("Cs"));
+        const isPrivate = !isGroup;
+
+        if (isTargetGroup || isPrivate) {
+            // تجاهل الرسائل التي تبدأ بـ ! أو . إذا أردت (اختياري)
+            if (msg.fromMe) return; // لا يرد على نفسه لتجنب اللوب
+
             await chat.sendStateTyping();
-            
-            const aiResponse = await getAIResponse(msg.body);
+            const aiResponse = await getAIResponse(body);
             await msg.reply(aiResponse);
+            console.log(`[SUCCESS] Replied to ${chatName}`);
         }
     } catch (error) {
         console.error('Error handling message:', error);
+        // tgBot.sendMessage(chatId, `❌ خطأ في معالجة الرسالة: ${error.message}`);
     }
 });
 
