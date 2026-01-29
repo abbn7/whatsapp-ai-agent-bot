@@ -1,23 +1,22 @@
 {
   "name": "whatsapp-ai-agent",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "Manus",
-  "license": "ISC",
-  "description": "WhatsApp AI Agent with Groq models and Telegram QR delivery",
   "dependencies": {
     "axios": "^1.7.9",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "groq-sdk": "^0.9.0",
+    "mongodb": "^6.12.0",
+    "mongoose": "^8.22.0",
     "node-telegram-bot-api": "^0.66.0",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js#webpack-exodus"
+    "whatsapp-web.js": "^1.26.0",
+    "wwebjs-mongo": "^1.1.0"
   }
 }
